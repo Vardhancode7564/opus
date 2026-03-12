@@ -1,6 +1,6 @@
 """
 PROJECT AHAA - AI Hub for Academic Advancement
-Main Streamlit Application
+Main Streamlit Application with RBAC
 """
 
 import sys
@@ -13,6 +13,17 @@ import streamlit as st
 import pandas as pd
 import logging
 import streamlit.components.v1 as components
+
+# Import Authentication and DB modules
+from database.db import init_db
+from auth.auth_utils import is_logged_in, logout, get_user_role, get_user_name, check_admin_permission
+from auth.login import render_login_page
+from auth.register import render_register_page
+from pages.student_dashboard import render_student_dashboard
+from pages.admin_dashboard import render_admin_dashboard
+
+# Initialize DB on startup
+init_db()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,18 +82,63 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ── ROUTING AND AUTHENTICATION ──────────────────────────────────────────────
+
+# Initialize Session State for Search Results and Knowledge Graph persistence
+if "search_results" not in st.session_state:
+    st.session_state["search_results"] = None
+if "current_idea" not in st.session_state:
+    st.session_state["current_idea"] = None
+if "last_suggestions" not in st.session_state:
+    st.session_state["last_suggestions"] = None
+if "current_view" not in st.session_state:
+    st.session_state["current_view"] = "🏠 Home"
+
+# 1. Start with Login or Register if not authenticated
+if not is_logged_in():
+    tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
+    with tab1:
+        render_login_page()
+    with tab2:
+        render_register_page()
+    st.stop()  # Halt execution here if not logged in
+
+# 2. Get User Context
+user_role = get_user_role()
+user_name = get_user_name()
+
 # ── Sidebar Navigation ──────────────────────────────────────────────────────
-st.sidebar.markdown("## 🎓 Project AHAA")
-st.sidebar.markdown("*AI Hub for Academic Advancement*")
+st.sidebar.markdown(f"## 🎓 Project AHAA")
+st.sidebar.markdown(f"*Welcome, {user_name}*")
+st.sidebar.markdown(f"**Role: {user_role.capitalize()}**")
 st.sidebar.markdown("---")
 
+# Navigation options based on role
+nav_options = ["🏠 Home", "Dashboard", "💡 Submit Idea", "📚 Explore Projects", "🔗 Knowledge Graph"]
+if user_role == "admin":
+    nav_options.append("⚙️ Admin Panel")
+
+# Initialize session state current_view if not exists or if it's not in nav_options
+if "current_view" not in st.session_state:
+    st.session_state["current_view"] = "🏠 Home"
+
+# Sidebar radio for manual navigation
 page = st.sidebar.radio(
     "Navigate",
-    ["🏠 Home", "💡 Submit Idea", "📚 Explore Projects", "🔗 Knowledge Graph", "⚙️ Admin Panel"],
-    index=0,
+    nav_options,
+    key="nav_radio", # Added a key to help streamlit track the widget state
+    index=nav_options.index(st.session_state["current_view"]) if st.session_state["current_view"] in nav_options else 0,
 )
 
+# Update session state if page is changed via sidebar
+if page != st.session_state["current_view"]:
+    st.session_state["current_view"] = page
+
 st.sidebar.markdown("---")
+if st.sidebar.button("🚪 Logout", use_container_width=True):
+    logout()
+    st.rerun()
+
 st.sidebar.markdown(
     "**Data Sources**\n"
     "- GitHub Repositories\n"
@@ -92,9 +148,18 @@ st.sidebar.markdown(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE: HOME
+# ROUTING CONTROLLER
 # ══════════════════════════════════════════════════════════════════════════════
-if page == "🏠 Home":
+
+# ── PAGE: DASHBOARD (ROLE-BASED) ───────────────────────────────────────────
+if st.session_state["current_view"] == "Dashboard":
+    if user_role == "admin":
+        render_admin_dashboard()
+    else:
+        render_student_dashboard()
+
+# ── PAGE: HOME ──────────────────────────────────────────────────────────────
+elif st.session_state["current_view"] == "🏠 Home":
     st.markdown('<div class="main-header">🎓 Project AHAA</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="sub-header">AI Hub for Academic Advancement — '
@@ -145,10 +210,8 @@ if page == "🏠 Home":
         st.warning("⚠️ Database not connected. Go to Admin Panel to configure and populate data.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: SUBMIT IDEA
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "💡 Submit Idea":
+# ── PAGE: SUBMIT IDEA ────────────────────────────────────────────────────────
+elif st.session_state["current_view"] == "💡 Submit Idea":
     st.markdown("## 💡 Submit Your Project Idea")
     st.markdown("Enter your project idea below. We'll find similar existing projects and suggest improvements.")
 
@@ -192,6 +255,15 @@ elif page == "💡 Submit Idea":
 
                 # Search for similar projects
                 similar = search_similar(idea_embedding, top_k=5)
+                
+                # Persistence: Store results in session state
+                st.session_state["search_results"] = similar
+                st.session_state["current_idea"] = {
+                    "title": idea_title,
+                    "description": idea_description,
+                    "domain": idea_domain,
+                    "embedding": idea_embedding
+                }
 
                 if similar:
                     st.markdown("### 🔎 Similar Projects Found")
@@ -240,6 +312,7 @@ elif page == "💡 Submit Idea":
                             "domain": idea_domain,
                         }
                         suggestions = generate_suggestions(student_idea, similar)
+                        st.session_state["last_suggestions"] = suggestions
                         st.markdown(suggestions)
                 else:
                     st.info("No similar projects found in the database. Try adding projects via the Admin Panel first.")
@@ -248,14 +321,26 @@ elif page == "💡 Submit Idea":
                 st.error(f"Error during search: {e}")
                 logger.exception("Search error")
 
+    elif st.session_state.get("search_results"):
+        # PERSISTENCE: Display stored results if user returns to this tab
+        similar = st.session_state["search_results"]
+        st.markdown(f"### 🔎 Last Results for: **{st.session_state['current_idea']['title']}**")
+        
+        df = pd.DataFrame(similar)
+        display_cols = ["project_title", "description", "technologies", "source", "similarity_score", "project_link"]
+        available_cols = [c for c in display_cols if c in df.columns]
+        st.dataframe(df[available_cols], use_container_width=True)
+        
+        if st.session_state.get("last_suggestions"):
+            st.markdown("### 🤖 AI Improvement Suggestions")
+            st.markdown(st.session_state["last_suggestions"])
+
     elif submitted:
         st.warning("Please fill in both the project title and description.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: EXPLORE PROJECTS
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "📚 Explore Projects":
+# ── PAGE: EXPLORE PROJECTS ──────────────────────────────────────────────────
+elif st.session_state["current_view"] == "📚 Explore Projects":
     st.markdown("## 📚 Explore Projects")
     st.markdown("Browse all projects collected from GitHub, web scraping, and admin uploads.")
 
@@ -302,16 +387,21 @@ elif page == "📚 Explore Projects":
         logger.exception("Explore error")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: KNOWLEDGE GRAPH
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "🔗 Knowledge Graph":
+# ── PAGE: KNOWLEDGE GRAPH ────────────────────────────────────────────────────
+elif st.session_state["current_view"] == "🔗 Knowledge Graph":
     st.markdown("## 🔗 Knowledge Graph")
-    st.markdown("Interactive visualization of project relationships based on semantic similarity.")
+    
+    # Mode Selection: Full Graph vs. Idea Context
+    graph_mode = st.radio(
+        "Select Graph Scope",
+        ["💡 My Idea Context", "🌐 Full Knowledge Base"],
+        horizontal=True,
+        help="Context mode shows your submitted idea and its direct relatives. Full mode shows all projects."
+    )
 
     try:
         from database.pinecone_db import get_all_projects
-        from processing.embedding_generator import generate_embeddings_batch
+        from processing.embedding_generator import generate_embeddings_batch, generate_embedding
         from processing.text_cleaner import prepare_project_text
         from visualization.graph_builder import (
             build_knowledge_graph,
@@ -320,49 +410,67 @@ elif page == "🔗 Knowledge Graph":
         )
         from config import SIMILARITY_THRESHOLD
 
-        projects = get_all_projects(limit=100)
+        projects = []
+        if graph_mode == "💡 My Idea Context":
+            if st.session_state.get("search_results") and st.session_state.get("current_idea"):
+                # Use current idea as a "project" node
+                idea = st.session_state["current_idea"]
+                idea_node = {
+                    "project_id": "current_user_idea",
+                    "project_title": f"YOUR IDEA: {idea['title']}",
+                    "description": idea["description"],
+                    "source": "user_idea",
+                    "embedding": idea["embedding"]
+                }
+                # Similar projects from search results
+                similar_projs = st.session_state["search_results"]
+                projects = [idea_node] + similar_projs
+                st.info(f"Visualizing relationship between your idea and {len(similar_projs)} similar projects.")
+            else:
+                st.warning("No project remains in memory. Please submit an idea first in the '💡 Submit Idea' tab.")
+                st.stop()
+        else:
+            projects = get_all_projects(limit=50) # Limit for performance
 
         if len(projects) < 2:
-            st.info("Need at least 2 projects to build a knowledge graph. Add more via Admin Panel.")
+            st.info("Insufficient data to build a graph. Add more projects or submit an idea first.")
         else:
             threshold = st.slider(
                 "Similarity Threshold (edges shown above this value)",
                 min_value=0.3,
                 max_value=0.95,
-                value=SIMILARITY_THRESHOLD,
+                value=0.4 if graph_mode == "💡 My Idea Context" else SIMILARITY_THRESHOLD,
                 step=0.05,
             )
 
             if st.button("🔄 Generate Graph", use_container_width=True):
-                with st.spinner("Computing embeddings and building graph..."):
-                    # Generate embeddings for all projects
-                    texts = [prepare_project_text(p) for p in projects]
-                    embeddings = generate_embeddings_batch(texts)
+                with st.spinner("Building relationship graph..."):
+                    # Extract embeddings
+                    embeddings = []
+                    for p in projects:
+                        if "embedding" in p:
+                            embeddings.append(p["embedding"])
+                        else:
+                            text = prepare_project_text(p)
+                            embeddings.append(generate_embedding(text))
 
                     # Compute similarity matrix
                     sim_matrix = compute_similarity_matrix(embeddings)
 
-                    # Temporarily override threshold
-                    import config
-                    original_threshold = config.SIMILARITY_THRESHOLD
-                    config.SIMILARITY_THRESHOLD = threshold
-
                     # Build and render graph
-                    G = build_knowledge_graph(projects, sim_matrix)
-                    graph_path = os.path.join(
-                        os.path.dirname(os.path.abspath(__file__)), "graph.html"
-                    )
+                    G = build_knowledge_graph(projects, sim_matrix, threshold=threshold)
+                    graph_path = os.path.join(os.getcwd(), "graph.html")
                     render_graph_html(G, graph_path)
-
-                    config.SIMILARITY_THRESHOLD = original_threshold
 
                     # Display graph
                     if os.path.exists(graph_path):
                         with open(graph_path, "r", encoding="utf-8") as f:
                             html_content = f.read()
-                        components.html(html_content, height=650, scrolling=True)
-
+                        
+                        st.components.v1.html(html_content, height=650, scrolling=True)
                         st.markdown(f"**Graph Stats:** {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+                    else:
+                        st.error("Failed to generate graph file.")
 
                     # Legend
                     st.markdown("### Legend")
@@ -379,10 +487,11 @@ elif page == "🔗 Knowledge Graph":
         logger.exception("Graph error")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: ADMIN PANEL
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "⚙️ Admin Panel":
+# ── PAGE: ADMIN PANEL ────────────────────────────────────────────────────────
+elif st.session_state["current_view"] == "⚙️ Admin Panel":
+    # SECURE THE ADMIN PANEL
+    check_admin_permission()
+
     st.markdown("## ⚙️ Admin Panel")
     st.markdown("Manage data sources and project database.")
 

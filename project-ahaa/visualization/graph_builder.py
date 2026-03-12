@@ -10,7 +10,7 @@ from config import SIMILARITY_THRESHOLD
 logger = logging.getLogger(__name__)
 
 
-def build_knowledge_graph(projects, similarity_matrix=None):
+def build_knowledge_graph(projects, similarity_matrix=None, threshold=None):
     """
     Build a NetworkX graph from projects.
     Nodes = projects, Edges = similarity above threshold.
@@ -18,6 +18,9 @@ def build_knowledge_graph(projects, similarity_matrix=None):
     If similarity_matrix is provided, use it.
     Otherwise, compute pairwise similarities using embeddings.
     """
+    # Use provided threshold or default from config
+    sim_limit = threshold if threshold is not None else SIMILARITY_THRESHOLD
+    
     G = nx.Graph()
 
     # Add nodes
@@ -29,8 +32,12 @@ def build_knowledge_graph(projects, similarity_matrix=None):
             "github": "#4078c0",
             "web": "#2ecc71",
             "admin": "#e74c3c",
+            "user_idea": "#f1c40f", # Gold color for user node
         }
         color = color_map.get(source, "#95a5a6")
+        
+        # Make the user node larger
+        size = 35 if source == "user_idea" else 20
 
         G.add_node(
             title,
@@ -38,7 +45,7 @@ def build_knowledge_graph(projects, similarity_matrix=None):
             title=f"{title}\nSource: {source}\nTech: {proj.get('technologies', 'N/A')}",
             color=color,
             source=source,
-            size=20,
+            size=size,
         )
 
     # Add edges based on similarity
@@ -46,7 +53,7 @@ def build_knowledge_graph(projects, similarity_matrix=None):
         for i in range(len(projects)):
             for j in range(i + 1, len(projects)):
                 sim = similarity_matrix[i][j]
-                if sim >= SIMILARITY_THRESHOLD:
+                if sim >= sim_limit:
                     title_i = projects[i].get("project_title", f"Project {i}")
                     title_j = projects[j].get("project_title", f"Project {j}")
                     G.add_edge(
