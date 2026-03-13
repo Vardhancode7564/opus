@@ -3,20 +3,18 @@ from database.db import create_user, get_user_by_email
 
 def render_register_page():
     """Renders the registration interface on the Streamlit app."""
-    st.markdown("<div class='main-header'>📝 Project AHAA Registration</div>", unsafe_allow_html=True)
-    st.markdown("<div class='sub-header'>Create an account to get started.</div>", unsafe_allow_html=True)
-    
+    # Headers moved to app.py for layout consistency
     with st.form("register_form"):
         name = st.text_input("👤 Full Name", placeholder="Enter your full name")
         email = st.text_input("📧 Email Address", placeholder="e.g. student@test.com")
         password = st.text_input("🔑 Password", type="password", placeholder="Create a strong password")
         confirm_password = st.text_input("🔑 Confirm Password", type="password", placeholder="Re-enter your password")
-        role = st.selectbox("👤 Select Role", ["student", "admin"], help="Admins have access to data ingestion tools.")
         
-        submitted = st.form_submit_button("Create Account", use_container_width=True)
+        submitted = st.form_submit_button("Join AHAA", use_container_width=True)
 
     if submitted:
         if name and email and password and confirm_password:
+            role = "student" # Default role for all registrations
             if password != confirm_password:
                 st.error("❌ Passwords do not match.")
             elif len(password) < 6:
@@ -25,7 +23,18 @@ def render_register_page():
                 st.error("❌ Email already registered. Please login instead.")
             else:
                 if create_user(name, email, password, role):
-                    st.success("✅ Registration successful! Please switch to the Login tab.")
+                    # Clear existing session data before setting new user context
+                    for key in list(st.session_state.keys()):
+                        del st.session_state[key]
+                        
+                    # Automatically log in the user after registration
+                    st.session_state["logged_in"] = True
+                    st.session_state["user_role"] = role
+                    st.session_state["user_name"] = name
+                    st.session_state["user_email"] = email
+                    
+                    st.success(f"✅ Registration successful! Welcome, {name}!")
+                    st.rerun() # Refresh app to bypass login screens
                 else:
                     st.error("❌ Something went wrong. Please try again later.")
         else:

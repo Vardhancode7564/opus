@@ -58,10 +58,11 @@ def get_user_by_email(email):
 
 if __name__ == "__main__":
     init_db()
-    # Create demo users if they don't exist
+    # Create required users if they don't exist
+    if not get_user_by_email("adminaah@gmail.com"):
+        create_user("Admin AHAA", "adminaah@gmail.com", "Ahaa@2026", "admin")
+        print("Created Admin: adminaah@gmail.com")
+    # Backup demo users (optional, can be removed if not needed)
     if not get_user_by_email("student@test.com"):
         create_user("Student User", "student@test.com", "student123", "student")
         print("Created demo student: student@test.com / student123")
-    if not get_user_by_email("admin@test.com"):
-        create_user("Admin User", "admin@test.com", "admin123", "admin")
-        print("Created demo admin: admin@test.com / admin123")

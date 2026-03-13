@@ -79,6 +79,14 @@ st.markdown("""
         padding: 10px 20px;
         border-radius: 8px 8px 0 0;
     }
+    /* Hide the top navigation menu (tabs like 'app', 'admin dashboard', etc.) */
+    [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
+    /* Hide the status/profile indicators at the top right if any */
+    .stAppDeployButton, [data-testid="stStatusWidget"] {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -96,7 +104,200 @@ if "current_view" not in st.session_state:
 
 # 1. Start with Login or Register if not authenticated
 if not is_logged_in():
-    tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
+    st.markdown("""
+        <style>
+            /* ── Reset Streamlit Chrome ── */
+            header,
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            footer {
+                display: none !important;
+            }
+
+            [data-testid="stSidebar"],
+            .stSidebar {
+                display: none !important;
+                width: 0px !important;
+            }
+
+            /* ── Full-page dark background ── */
+            .stApp {
+                background-color: #0d1117 !important;
+            }
+
+            /* ── Outer wrapper: vertically + horizontally center the card ── */
+            [data-testid="stAppViewBlockContainer"] {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                min-height: 100vh !important;
+                padding: 2rem 1rem !important;
+            }
+
+            /* ── The card itself ── */
+            .main .block-container {
+                width: 100% !important;
+                max-width: 460px !important;
+                padding: 2rem 2.5rem 2.5rem !important;
+                background-color: #161b22 !important;
+                border: 1px solid #30363d !important;
+                border-radius: 14px !important;
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65) !important;
+                margin: auto !important;
+            }
+
+            /* ── Force inner blocks to fill the card ── */
+            [data-testid="stVerticalBlock"],
+            [data-testid="stForm"] {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            [data-baseweb="tab-panel"] {
+                width: 100% !important;
+                padding: 0 !important;
+            }
+
+            /* ── Header ── */
+            .main-header {
+                font-size: 1.9rem !important;
+                font-weight: 700 !important;
+                color: #8b5cf6 !important;
+                -webkit-text-fill-color: #8b5cf6 !important;
+                background: none !important;
+                text-align: center !important;
+                margin: 0 0 4px !important;
+                padding: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 4px !important;
+            }
+
+            .header-icon {
+                font-size: 2.6rem !important;
+            }
+
+            .sub-header {
+                color: #8b949e !important;
+                text-align: center !important;
+                font-size: 0.88rem !important;
+                line-height: 1.5 !important;
+                margin: 0 0 20px !important;
+                padding: 0 !important;
+            }
+
+            /* ── Tabs ── */
+            [data-baseweb="tab-list"] {
+                justify-content: center !important;
+                gap: 24px !important;
+                border-bottom: 2px solid #30363d !important;
+                margin-bottom: 22px !important;
+                padding: 0 !important;
+            }
+
+            [data-baseweb="tab"] {
+                color: #768390 !important;
+                font-weight: 600 !important;
+                font-size: 1rem !important;
+                padding: 8px 4px 12px !important;
+                border-bottom: 2px solid transparent !important;
+                background: none !important;
+            }
+
+            [aria-selected="true"] {
+                color: #ef4444 !important;
+                border-bottom: 2px solid #ef4444 !important;
+            }
+
+            /* ── Form container ── */
+            [data-testid="stForm"] {
+                border: 1px solid #30363d !important;
+                background-color: #0d1117 !important;
+                padding: 28px 28px 32px !important;
+                border-radius: 10px !important;
+            }
+
+            /* ── Labels ── */
+            label,
+            [data-testid="stWidgetLabel"] p {
+                color: #cdd9e5 !important;
+                font-size: 0.9rem !important;
+                font-weight: 500 !important;
+                margin-bottom: 4px !important;
+                text-align: left !important;
+            }
+
+            /* ── Input fields ── */
+            div[data-baseweb="input"] {
+                background-color: #1c2128 !important;
+                border: 1px solid #444c56 !important;
+                border-radius: 6px !important;
+                transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+            }
+
+            div[data-baseweb="input"]:focus-within {
+                border-color: #58a6ff !important;
+                box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.18) !important;
+            }
+
+            input {
+                color: #adbac7 !important;
+                font-size: 0.95rem !important;
+                text-align: left !important;
+            }
+
+            input::placeholder {
+                color: #484f58 !important;
+            }
+
+            /* ── Submit button ── */
+            button[kind="primaryFormSubmit"] {
+                width: 100% !important;
+                background-color: transparent !important;
+                border: 1px solid #58a6ff !important;
+                color: #58a6ff !important;
+                border-radius: 6px !important;
+                font-weight: 600 !important;
+                font-size: 0.9rem !important;
+                letter-spacing: 0.08em !important;
+                text-transform: uppercase !important;
+                padding: 0.65rem 1rem !important;
+                margin-top: 28px !important;
+                transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease !important;
+            }
+
+            button[kind="primaryFormSubmit"]:hover {
+                background-color: rgba(88, 166, 255, 0.12) !important;
+                color: #ffffff !important;
+                transform: translateY(-1px) !important;
+            }
+
+            /* ── Tighten vertical spacing inside card ── */
+            [data-testid="stVerticalBlock"] > div {
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+            }
+
+            [data-testid="stVerticalBlock"] {
+                gap: 2px !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+        <div class='main-header'>
+            <span class='header-icon'>🔓</span>
+            Project AHAA Login
+        </div>
+    """, unsafe_allow_html=True)
+    st.markdown(
+        "<div class='sub-header'>Research. Validate. Innovate.<br>"
+        "Discover and search innovative ideas on AHAA.</div>",
+        unsafe_allow_html=True,
+    )
+
+    tab1, tab2 = st.tabs(["🔒 Account Login", "📝 Join AHAA"])
     with tab1:
         render_login_page()
     with tab2:
@@ -114,7 +315,7 @@ st.sidebar.markdown(f"**Role: {user_role.capitalize()}**")
 st.sidebar.markdown("---")
 
 # Navigation options based on role
-nav_options = ["🏠 Home", "Dashboard", "💡 Submit Idea", "📚 Explore Projects", "🔗 Knowledge Graph"]
+nav_options = ["🏠 Home", "💡 Submit Idea", "📚 Explore Projects", "🔗 Knowledge Graph"]
 if user_role == "admin":
     nav_options.append("⚙️ Admin Panel")
 
@@ -138,13 +339,6 @@ st.sidebar.markdown("---")
 if st.sidebar.button("🚪 Logout", use_container_width=True):
     logout()
     st.rerun()
-
-st.sidebar.markdown(
-    "**Data Sources**\n"
-    "- GitHub Repositories\n"
-    "- Web Scraping\n"
-    "- Admin Uploads"
-)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

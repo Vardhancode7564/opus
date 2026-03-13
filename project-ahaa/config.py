@@ -4,9 +4,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # API Keys
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "")
-PINECONE_INDEX = os.getenv("PINECONE_INDEX", "project-ahaa")
+import streamlit as st
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY") or st.secrets.get("PINECONE_API_KEY", "")
+
+PINECONE_INDEX = os.getenv("PINECONE_INDEX") or st.secrets.get("PINECONE_INDEX", "project-ahaa")
 
 # Embedding model
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
